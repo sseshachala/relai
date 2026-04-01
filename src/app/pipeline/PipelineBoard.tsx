@@ -70,7 +70,8 @@ export default function PipelineBoard({ deals }: { deals: Deal[] }) {
 function DealCard({ deal }: { deal: Deal }) {
   const urg  = deal.urgency ?? 'low'
   const conf = Math.round((deal.confidence ?? 0) * 100)
-  const urgColor = { high: 'var(--red)', medium: 'var(--amber)', low: 'var(--green)' }[urg]
+  const URG: Record<string, string> = { high: 'var(--red)', medium: 'var(--amber)', low: 'var(--green)' }
+  const urgColor = URG[urg] ?? 'var(--green)'
 
   return (
     <div style={{

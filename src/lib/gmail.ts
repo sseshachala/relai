@@ -155,7 +155,7 @@ export async function fetchNewThreadsSince(
   }
 
   const threads = await Promise.all(
-    [...threadIds].slice(0, 20).map(id => fetchThread(accessToken, id))
+    Array.from(threadIds).slice(0, 20).map(id => fetchThread(accessToken, id))
   )
 
   return threads.filter(Boolean) as EmailThread[]

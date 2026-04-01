@@ -195,8 +195,10 @@ export default function AnalyseForm() {
 function ResultPanel({ data, saved }: { data: DealAnalysis; saved: boolean }) {
   const conf      = Math.round((data.confidence ?? 0) * 100)
   const isDeal    = data.is_deal
-  const stageCol  = { prospect:'var(--accent)', active:'var(--green)', stalled:'var(--amber)', closed:'var(--muted)' }[data.deal_stage ?? ''] ?? 'var(--muted)'
-  const urgCol    = { high:'var(--red)', medium:'var(--amber)', low:'var(--green)' }[data.urgency ?? ''] ?? 'var(--muted)'
+  const STAGE_COLORS: Record<string, string> = { prospect:'var(--accent)', active:'var(--green)', stalled:'var(--amber)', closed:'var(--muted)' }
+  const URG_COLORS:   Record<string, string> = { high:'var(--red)', medium:'var(--amber)', low:'var(--green)' }
+  const stageCol = data.deal_stage ? (STAGE_COLORS[data.deal_stage] ?? 'var(--muted)') : 'var(--muted)'
+  const urgCol   = data.urgency    ? (URG_COLORS[data.urgency]      ?? 'var(--muted)') : 'var(--muted)'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
