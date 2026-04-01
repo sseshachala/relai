@@ -41,8 +41,10 @@ export default async function ContactsPage() {
               const sent     = c.sentiment ?? 'neutral'
               const meta     = [c.email, c.company, c.role].filter(Boolean).join(' · ')
               const dateStr  = new Date(c.created_at).toLocaleDateString('en-US', { month:'short', day:'numeric' })
-              const sentColor = { positive:'var(--green)', neutral:'var(--muted)', negative:'var(--red)' }[sent as string] ?? 'var(--muted)'
-              const sentBg    = { positive:'var(--green-dim)', neutral:'var(--bg2)', negative:'var(--red-dim)' }[sent as string] ?? 'var(--bg2)'
+              const SENT_COLOR: Record<string, string> = { positive:'var(--green)', neutral:'var(--muted)', negative:'var(--red)' }
+              const SENT_BG:    Record<string, string> = { positive:'var(--green-dim)', neutral:'var(--bg2)', negative:'var(--red-dim)' }
+              const sentColor = SENT_COLOR[sent] ?? 'var(--muted)'
+              const sentBg    = SENT_BG[sent]    ?? 'var(--bg2)'
 
               return (
                 <div key={c.id} style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--radius)', padding:'13px 16px', display:'flex', alignItems:'center', gap:14 }}>
