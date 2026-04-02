@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateDigest } from '@/lib/claude'
+<<<<<<< HEAD
 import { unstable_noStore as noStore } from 'next/cache'
+=======
+>>>>>>> 6c16883299289354cab9c4f0be1323554ff7c358
 
 export async function POST(req: NextRequest) {
   // Tell Next.js this route is always dynamic — never pre-render or cache it
@@ -53,6 +56,7 @@ export async function POST(req: NextRequest) {
 
     const digest = await generateDigest(payload)
 
+<<<<<<< HEAD
     // Send email if requested and Resend is configured
     const body = await req.json().catch(() => ({}))
     const sendEmail = body?.sendEmail === true
@@ -85,6 +89,28 @@ export async function POST(req: NextRequest) {
             </div>`,
         })
       }
+=======
+    // Send via email only if Resend key exists and user requested it
+    const body = await req.json().catch(() => ({ sendEmail: false }))
+    const sendEmail = body?.sendEmail ?? false
+
+    if (sendEmail && user.email && process.env.RESEND_API_KEY) {
+      const { Resend } = await import('resend')
+      const resend = new Resend(process.env.RESEND_API_KEY)
+      await resend.emails.send({
+        from:    process.env.RESEND_FROM_EMAIL || 'digest@prelai.org',
+        to:      user.email,
+        subject: `Your Relai digest — ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`,
+        html: `<div style="font-family:Georgia,serif;max-width:560px;margin:40px auto;color:#1a1814;line-height:1.85;font-size:16px;">
+          <p style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8a8680;margin-bottom:20px;">
+            ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </p>
+          <p>${digest.replace(/\n\n/g, '</p><p>')}</p>
+          <hr style="border:none;border-top:1px solid #eceae3;margin:32px 0;">
+          <p style="font-size:12px;color:#8a8680;">Relai · AI Relationship Intelligence</p>
+        </div>`,
+      })
+>>>>>>> 6c16883299289354cab9c4f0be1323554ff7c358
     }
 
     return NextResponse.json({ digest })
