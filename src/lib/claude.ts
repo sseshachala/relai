@@ -1,9 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { DealAnalysis } from '@/types'
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY!,
-})
+function getClient() {
+  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
+}
 
 // ── Prompts ────────────────────────────────────────────────────────────
 const ANALYSE_SYSTEM = `You are a deal intelligence engine for an AI-first CRM. 
@@ -47,6 +47,7 @@ export function smartTruncate(text: string, maxChars = 6000): string {
 // ── Core AI tasks ──────────────────────────────────────────────────────
 export async function analyseThread(thread: string): Promise<DealAnalysis> {
   const truncated = smartTruncate(thread)
+  const anthropic = getClient()
 
   const message = await anthropic.messages.create({
     model:      'claude-sonnet-4-5',
@@ -68,6 +69,7 @@ export async function generateDigest(payload: {
   deals:    Array<{ stage: string | null; urgency: string | null; next_action: string | null; summary: string; contact: string; company: string }>
   contacts: Array<{ name: string | null; company: string | null; sentiment: string | null; last_topic: string | null }>
 }): Promise<string> {
+  const anthropic = getClient()
   const message = await anthropic.messages.create({
     model:      'claude-sonnet-4-5',
     max_tokens: 500,

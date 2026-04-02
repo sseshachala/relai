@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { analyseThread } from '@/lib/claude'
 import { AnalyseRequest, AnalyseResponse } from '@/types'
+import { unstable_noStore as noStore } from 'next/cache'
 
 export async function POST(req: NextRequest) {
+  noStore()
   try {
     const { thread } = (await req.json()) as AnalyseRequest
 
