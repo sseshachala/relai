@@ -16,6 +16,10 @@ function LoginContent() {
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
         scopes: 'email profile https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.readonly',
+        queryParams: {
+          access_type: 'offline',  // Request refresh token
+          prompt:      'consent',  // Force consent screen so Google always issues refresh token
+        },
       },
     })
   }
@@ -38,16 +42,13 @@ function LoginContent() {
           Connect your Gmail and Calendar. Relai builds your CRM automatically — no manual entry.
         </p>
 
-        <button
-          onClick={signInWithGoogle}
-          style={{
-            width:'100%', padding:'13px 24px',
-            background:'var(--accent)', color:'#fff',
-            border:'none', borderRadius:10,
-            fontFamily:'var(--sans)', fontSize:14, fontWeight:500,
-            cursor:'pointer',
-          }}
-        >
+        <button onClick={signInWithGoogle} style={{
+          width:'100%', padding:'13px 24px',
+          background:'var(--accent)', color:'#fff',
+          border:'none', borderRadius:10,
+          fontFamily:'var(--sans)', fontSize:14, fontWeight:500,
+          cursor:'pointer',
+        }}>
           Continue with Google
         </button>
 
@@ -71,4 +72,3 @@ export default function LoginPage() {
     </Suspense>
   )
 }
-
