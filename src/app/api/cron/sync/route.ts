@@ -89,8 +89,9 @@ export async function GET(req: NextRequest) {
   })
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function runSyncForUser(
-  supabase: ReturnType<typeof createServiceClient>,
+  supabase: any,
   userId: string,
   accessToken: string,
   lastHistoryId: string | null
@@ -256,8 +257,9 @@ async function runSyncForUser(
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function linkCalendarThreads(
-  supabase: ReturnType<typeof createServiceClient>,
+  supabase: any,
   userId: string,
   retentionDays: number
 ) {
