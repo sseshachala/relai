@@ -27,7 +27,7 @@ export default function OnboardingPage() {
     setStatus('syncing'); setError(null); setStepIdx(0)
 
     const ticker = setInterval(() => {
-      setStepIdx(i => Math.min(i + 1, STEPS.length - 1))
+      setStepIdx((i: number) => Math.min(i + 1, STEPS.length - 1))
     }, 2200)
 
     try {
@@ -127,7 +127,7 @@ export default function OnboardingPage() {
                 { label: 'Threads scanned', value: processed, color: 'var(--text)' },
                 { label: 'Deals found',     value: deals,     color: 'var(--green)' },
                 { label: 'Contacts built',  value: contacts,  color: 'var(--accent)' },
-              ].map(s => (
+              ].map((s: { label: string; value: number; color: string }) => (
                 <div key={s.label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px' }}>
                   <div style={{ fontFamily: 'var(--mono)', fontSize: 9, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 5 }}>{s.label}</div>
                   <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>

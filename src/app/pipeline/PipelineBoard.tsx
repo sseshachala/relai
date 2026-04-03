@@ -1,4 +1,5 @@
 'use client'
+import React from 'react'
 import { useRouter } from 'next/navigation'
 import { Deal } from '@/types'
 
@@ -82,11 +83,11 @@ export default function PipelineBoard({ deals }: { deals: Deal[] }) {
                         cursor: 'pointer',
                         transition: 'border-color .15s, transform .1s',
                       }}
-                      onMouseOver={e => {
+                      onMouseOver={(e: React.MouseEvent<HTMLDivElement>) => {
                         (e.currentTarget as HTMLDivElement).style.borderColor = accent;
                         (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'
                       }}
-                      onMouseOut={e => {
+                      onMouseOut={(e: React.MouseEvent<HTMLDivElement>) => {
                         (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)';
                         (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'
                       }}

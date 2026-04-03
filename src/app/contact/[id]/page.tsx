@@ -19,6 +19,8 @@ export default async function ContactPage({ params }: { params: { id: string } }
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  type DealRow = { id: string; summary: string | null; deal_stage: string | null; created_at: string; thread_text: string | null }
+
   const [{ data: contact }, { data: deals }, { data: contacts }] = await Promise.all([
     supabase.from('contacts').select('*').eq('id', params.id).eq('user_id', user.id).single(),
     supabase.from('deals').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
@@ -27,9 +29,9 @@ export default async function ContactPage({ params }: { params: { id: string } }
 
   if (!contact) notFound()
 
-  const relatedDeals = (deals ?? []).filter(d => {
+  const relatedDeals = (deals as DealRow[] ?? []).filter((d: DealRow) => {
     if (!contact.email) return false
-    return d.thread_text?.toLowerCase().includes(contact.email.toLowerCase())
+    return (d.thread_text ?? '').toLowerCase().includes(contact.email.toLowerCase())
   })
 
   const sent    = contact.sentiment ?? 'neutral'
@@ -97,15 +99,13 @@ export default async function ContactPage({ params }: { params: { id: string } }
               <p style={{ fontSize: 13, color: 'var(--muted)' }}>No deals found involving this contact.</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {relatedDeals.map(d => (
-                  <DealRow
-                    key={d.id}
-                    id={d.id}
-                    summary={d.summary}
-                    deal_stage={d.deal_stage}
-                    created_at={d.created_at}
-                  />
-                ))}
+                {relatedDeals.map((d: DealRow) => <DealRow
+                  key={d.id ?? ''}
+                  id={d.id ?? ''}
+                  summary={d.summary ?? null}
+                  deal_stage={d.deal_stage ?? null}
+                  created_at={d.created_at ?? ''}
+                />)}
               </div>
             )}
           </div>

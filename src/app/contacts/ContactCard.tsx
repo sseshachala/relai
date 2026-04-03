@@ -1,4 +1,5 @@
 'use client'
+import React from 'react'
 import Link from 'next/link'
 
 const SENT_COLOR: Record<string, string> = { positive: 'var(--green)', neutral: 'var(--muted)', negative: 'var(--red)' }
@@ -17,6 +18,7 @@ interface Props {
   role:       string | null
   sentiment:  string | null
   last_topic: string | null
+  key?:       string  // React key — not used in component
 }
 
 export default function ContactCard({ id, name, email, company, role, sentiment, last_topic }: Props) {
@@ -28,8 +30,8 @@ export default function ContactCard({ id, name, email, company, role, sentiment,
     <Link href={`/contact/${id}`} style={{ textDecoration: 'none' }}>
       <div
         style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', cursor: 'pointer', transition: 'border-color .15s' }}
-        onMouseOver={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
-        onMouseOut={e  => (e.currentTarget.style.borderColor = 'var(--border)')}
+        onMouseOver={(e: React.MouseEvent<HTMLDivElement>) => (e.currentTarget.style.borderColor = 'var(--accent)')}
+        onMouseOut={(e: React.MouseEvent<HTMLDivElement>)  => (e.currentTarget.style.borderColor = 'var(--border)')}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
           <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--accent-dim)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>

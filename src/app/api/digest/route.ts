@@ -34,8 +34,8 @@ export async function POST(req: NextRequest) {
   }
 
   const payload = {
-    deals:    (deals ?? []).map(d => ({ stage: d.deal_stage, urgency: d.urgency, next_action: d.next_action, summary: d.summary || '', contact: 'Unknown', company: '' })),
-    contacts: (contacts ?? []).map(c => ({ name: c.name, company: c.company, sentiment: c.sentiment, last_topic: c.last_topic })),
+    deals:    (deals ?? []).map((d: Record<string, string | null>) => ({ stage: d.deal_stage, urgency: d.urgency, next_action: d.next_action, summary: d.summary || '', contact: 'Unknown', company: '' })),
+    contacts: (contacts ?? []).map((c: Record<string, string | null>) => ({ name: c.name, company: c.company, sentiment: c.sentiment, last_topic: c.last_topic })),
   }
 
   const content = await generateDigest(payload)

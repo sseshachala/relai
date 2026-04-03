@@ -236,9 +236,9 @@ async function linkCalendarThreads(supabase: ReturnType<typeof createClient>, us
 
   for (const event of events) {
     const attendees = (event.attendee_emails ?? []) as string[]
-    const matched = snapshots.filter(s =>
-      (s.participants as string[]).some(p => attendees.some(a => p.toLowerCase().includes(a.toLowerCase())))
-    ).map(s => s.thread_id)
+    const matched = (snapshots as SnapRow[]).filter((s: SnapRow) =>
+      s.participants.some((p: string) => attendees.some((a: string) => p.toLowerCase().includes(a.toLowerCase())))
+    ).map((s: SnapRow) => s.thread_id)
 
     // Merge auto-linked with manually linked (preserve manual links)
     const existing = (event.linked_thread_ids ?? []) as string[]
@@ -260,8 +260,8 @@ async function triggerDigestRegen(supabase: ReturnType<typeof createClient>, use
 
     const { generateDigest } = await import('@/lib/claude')
     const digest = await generateDigest({
-      deals:    (deals ?? []).map(d => ({ stage: d.deal_stage, urgency: d.urgency, next_action: d.next_action, summary: d.summary || '', contact: 'Unknown', company: '' })),
-      contacts: (contacts ?? []).map(c => ({ name: c.name, company: c.company, sentiment: c.sentiment, last_topic: c.last_topic })),
+      deals:    (deals ?? []).map((d: {deal_stage:string|null;urgency:string|null;next_action:string|null;summary:string|null}) => ({ stage: d.deal_stage, urgency: d.urgency, next_action: d.next_action, summary: d.summary || '', contact: 'Unknown', company: '' })),
+      contacts: (contacts ?? []).map((c: {name:string|null;company:string|null;sentiment:string|null;last_topic:string|null}) => ({ name: c.name, company: c.company, sentiment: c.sentiment, last_topic: c.last_topic })),
     })
     await supabase.from('digests').insert({ user_id: userId, content: digest, trigger: 'sync' })
   } catch { /* non-fatal — digest regen failure shouldn't break sync */ }

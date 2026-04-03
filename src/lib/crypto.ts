@@ -10,7 +10,7 @@ const ALGO = 'AES-GCM'
 const KEY_LENGTH = 256
 
 function getEncryptionKey(): string {
-  const key = process.env.TOKEN_ENCRYPTION_KEY
+  const key = (globalThis as unknown as { process?: { env?: { TOKEN_ENCRYPTION_KEY?: string } } }).process?.env?.TOKEN_ENCRYPTION_KEY ?? ''
   if (!key || key.length < 64) {
     throw new Error('TOKEN_ENCRYPTION_KEY must be a 64-char hex string (32 bytes). Generate with: openssl rand -hex 32')
   }
@@ -31,7 +31,7 @@ function bytesToHex(bytes: Uint8Array): string {
 
 async function importKey(hexKey: string): Promise<CryptoKey> {
   const keyBytes = hexToBytes(hexKey)
-  return crypto.subtle.importKey('raw', keyBytes, { name: ALGO, length: KEY_LENGTH }, false, ['encrypt', 'decrypt'])
+  return crypto.subtle.importKey('raw', keyBytes.buffer as ArrayBuffer, { name: ALGO, length: KEY_LENGTH }, false, ['encrypt', 'decrypt'])
 }
 
 /**

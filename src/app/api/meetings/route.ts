@@ -49,7 +49,7 @@ export async function GET() {
   }
 
   // Enrich with linked thread snapshots
-  const enriched = await Promise.all((events ?? []).map(async event => {
+  const enriched = await Promise.all((events ?? []).map(async (event: Record<string, unknown>) => {
     const linkedIds = (event.linked_thread_ids ?? []) as string[]
     if (!linkedIds.length) return { ...event, linked_snapshots: [] }
     const { data: snapshots } = await supabase

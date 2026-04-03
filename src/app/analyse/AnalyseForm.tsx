@@ -1,4 +1,5 @@
 'use client'
+import React from 'react'
 import { useState, useRef } from 'react'
 import { DealAnalysis } from '@/types'
 
@@ -122,8 +123,8 @@ export default function AnalyseForm() {
         <textarea
           ref={textareaRef}
           value={thread}
-          onChange={e => { setThread(e.target.value); setResult(null); setError(null) }}
-          onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') analyse() }}
+          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => { setThread(e.target.value); setResult(null); setError(null) }}
+          onKeyDown={(e: React.KeyboardEvent<HTMLTextAreaElement>) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') analyse() }}
           placeholder={'Paste an email thread here...\n\nTip: click an example above, or use ⌘+Enter to analyse.'}
           style={{
             width: '100%', background: 'var(--bg)', border: `1px solid ${overLimit ? 'var(--amber)' : 'var(--border2)'}`,

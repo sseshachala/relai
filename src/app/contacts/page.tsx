@@ -10,6 +10,8 @@ export default async function ContactsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  type ContactRow = { id: string; name: string | null; email: string | null; company: string | null; role: string | null; sentiment: string | null; last_topic: string | null }
+
   const [{ data: deals }, { data: contacts }] = await Promise.all([
     supabase.from('deals').select('id').eq('user_id', user.id),
     supabase.from('contacts').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
@@ -34,18 +36,16 @@ export default async function ContactsPage() {
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-            {contacts.map(c => (
-              <ContactCard
-                key={c.id}
-                id={c.id}
-                name={c.name}
-                email={c.email}
-                company={c.company}
-                role={c.role}
-                sentiment={c.sentiment}
-                last_topic={c.last_topic}
-              />
-            ))}
+            {contacts.map((c: ContactRow) => <ContactCard
+              key={c.id ?? ''}
+              id={c.id ?? ''}
+              name={c.name ?? null}
+              email={c.email ?? null}
+              company={c.company ?? null}
+              role={c.role ?? null}
+              sentiment={c.sentiment ?? null}
+              last_topic={c.last_topic ?? null}
+            />)}
           </div>
         )}
       </main>

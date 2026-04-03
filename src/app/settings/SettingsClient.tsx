@@ -1,4 +1,5 @@
 'use client'
+import React from 'react'
 import { useState, useCallback } from 'react'
 
 const TIMEZONES = [
@@ -34,7 +35,7 @@ export default function SettingsClient({ initialSettings }: { initialSettings: S
   }, [])
 
   function update(field: keyof Settings, value: unknown) {
-    setSettings(s => ({ ...s, [field]: value }))
+    setSettings((s: Settings) => ({ ...s, [field]: value }))
     save(field, value)
   }
 
@@ -69,7 +70,7 @@ export default function SettingsClient({ initialSettings }: { initialSettings: S
       <div style={S.card}>
         <div style={S.label}>Timezone {savedField === 'timezone' && <span style={S.saved}>Saved</span>}</div>
         <div style={S.sub}>Used for daily digest email delivery time.</div>
-        <select value={settings.timezone} onChange={e => update('timezone', e.target.value)} style={S.select}>
+        <select value={settings.timezone} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => update('timezone', e.target.value)} style={S.select}>
           {TIMEZONES.map(tz => (
             <option key={tz} value={tz}>{tz.replace('_', ' ')}</option>
           ))}
@@ -94,7 +95,7 @@ export default function SettingsClient({ initialSettings }: { initialSettings: S
             <span style={{ fontSize: 13, color: 'var(--muted)' }}>Send at</span>
             <select
               value={settings.digest_hour}
-              onChange={e => update('digest_hour', parseInt(e.target.value))}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => update('digest_hour', parseInt(e.target.value))}
               style={S.select}>
               {hours.map(h => (
                 <option key={h} value={h}>
@@ -104,7 +105,7 @@ export default function SettingsClient({ initialSettings }: { initialSettings: S
             </select>
             <select
               value={settings.digest_minute}
-              onChange={e => update('digest_minute', parseInt(e.target.value))}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => update('digest_minute', parseInt(e.target.value))}
               style={S.select}>
               {minutes.map(m => (
                 <option key={m} value={m}>{m === 0 ? ':00' : `:${m}`}</option>
@@ -148,9 +149,9 @@ export default function SettingsClient({ initialSettings }: { initialSettings: S
         <div style={S.sub}>Only sync emails containing these keywords. Leave empty to sync all. Comma-separated.</div>
         <textarea
           value={keywords}
-          onChange={e => setKeywords(e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setKeywords(e.target.value)}
           onBlur={() => {
-            const filters = keywords.split(',').map(k => k.trim()).filter(Boolean)
+            const filters = keywords.split(',').map((k: string) => k.trim()).filter(Boolean)
             update('keyword_filters', filters)
           }}
           placeholder="proposal, contract, invoice, quote, agreement, pricing"

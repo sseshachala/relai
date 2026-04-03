@@ -269,11 +269,14 @@ async function linkCalendarThreads(
   const { data: snapshots } = await supabase.from('thread_snapshots').select('id, thread_id, participants').eq('user_id', userId).gte('created_at', cutoff)
   if (!snapshots?.length) return
 
-  for (const event of events) {
+  type SnapRow = { id: string; thread_id: string; participants: string[] }
+  type EventRow = { id: string; attendee_emails: string[] | null; linked_thread_ids: string[] | null }
+
+  for (const event of (events as EventRow[])) {
     const attendees = (event.attendee_emails ?? []) as string[]
-    const matched   = snapshots
-      .filter(s => (s.participants as string[]).some(p => attendees.some(a => p.toLowerCase().includes(a.toLowerCase()))))
-      .map(s => s.thread_id)
+    const matched   = (snapshots as SnapRow[])
+      .filter((s: SnapRow) => s.participants.some((p: string) => attendees.some((a: string) => p.toLowerCase().includes(a.toLowerCase()))))
+      .map((s: SnapRow) => s.thread_id)
     const existing  = (event.linked_thread_ids ?? []) as string[]
     const merged    = [...new Set([...existing, ...matched])]
     if (merged.length !== existing.length) {

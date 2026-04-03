@@ -1,4 +1,5 @@
 'use client'
+import React from 'react'
 import { useState } from 'react'
 
 interface SyncConfig {
@@ -70,14 +71,14 @@ export default function SyncSettings({
   async function saveConfig() {
     setSaving(true); setSaveMsg(null)
     try {
-      const keywords = keywordInput.split(',').map(k => k.trim()).filter(Boolean)
+      const keywords = keywordInput.split(',').map((k: string) => k.trim()).filter(Boolean)
       const res  = await fetch('/api/sync-config', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...config, keywords }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      setConfig(c => ({ ...c, keywords }))
+      setConfig((c: typeof config) => ({ ...c, keywords }))
       setSaveMsg('Settings saved')
     } catch (err) {
       setSaveMsg(err instanceof Error ? err.message : 'Save failed')
@@ -124,7 +125,7 @@ export default function SyncSettings({
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', margin: 0 }}>
             <span style={{ fontSize: 13, color: 'var(--muted)' }}>Auto-sync enabled</span>
             <div
-              onClick={() => setConfig(c => ({ ...c, enabled: !c.enabled }))}
+              onClick={() => setConfig((c: typeof config) => ({ ...c, enabled: !c.enabled }))}
               style={{
                 width: 36, height: 20, borderRadius: 10, cursor: 'pointer',
                 background: config.enabled ? 'var(--green)' : 'var(--border2)',
@@ -145,7 +146,7 @@ export default function SyncSettings({
             <span style={label}>Look back</span>
             <select
               value={config.lookback_days}
-              onChange={e => setConfig(c => ({ ...c, lookback_days: +e.target.value }))}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfig((c: typeof config) => ({ ...c, lookback_days: +e.target.value }))}
               style={selectStyle}
             >
               <option value={7}>Last 7 days</option>
@@ -159,7 +160,7 @@ export default function SyncSettings({
             <span style={label}>Threads per sync</span>
             <select
               value={config.max_threads}
-              onChange={e => setConfig(c => ({ ...c, max_threads: +e.target.value }))}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfig((c: typeof config) => ({ ...c, max_threads: +e.target.value }))}
               style={selectStyle}
             >
               <option value={5}>5 threads</option>
@@ -172,7 +173,7 @@ export default function SyncSettings({
             <span style={label}>Sync frequency</span>
             <select
               value={config.schedule_mins}
-              onChange={e => setConfig(c => ({ ...c, schedule_mins: +e.target.value }))}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfig((c: typeof config) => ({ ...c, schedule_mins: +e.target.value }))}
               style={selectStyle}
             >
               <option value={15}>Every 15 minutes</option>
@@ -188,7 +189,7 @@ export default function SyncSettings({
           <input
             type="text"
             value={keywordInput}
-            onChange={e => setKeywordInput(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setKeywordInput(e.target.value)}
             placeholder="proposal, contract, invoice, partnership — comma separated"
             style={{ ...selectStyle, width: '100%' }}
           />
@@ -202,7 +203,7 @@ export default function SyncSettings({
             <input
               type="checkbox"
               checked={config.include_calendar}
-              onChange={e => setConfig(c => ({ ...c, include_calendar: e.target.checked }))}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfig((c: typeof config) => ({ ...c, include_calendar: e.target.checked }))}
             />
             <span style={{ fontSize: 13 }}>Include Google Calendar events</span>
           </label>
