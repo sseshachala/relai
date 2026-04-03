@@ -1,72 +1,122 @@
 'use client'
 import { useState, useEffect } from 'react'
 
+type SyncState = 'idle' | 'syncing' | 'done' | 'blocked'
+
 export default function SyncButton() {
-  const [syncing,    setSyncing]    = useState(false)
+  const [state,     setState]     = useState<SyncState>('idle')
+  const [progress,  setProgress]  = useState('')
   const [lastSynced, setLastSynced] = useState<string | null>(null)
-  const [message,    setMessage]    = useState<string | null>(null)
+  const [summary,   setSummary]   = useState<{ processed: number; deals: number; contacts: number } | null>(null)
+  const [error,     setError]     = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchSyncState()
-  }, [])
+  useEffect(() => { fetchState() }, [])
 
-  async function fetchSyncState() {
-    const res  = await fetch('/api/sync')
-    const data = await res.json()
-    if (data.state?.last_synced_at) {
-      setLastSynced(data.state.last_synced_at)
-    }
+  async function fetchState() {
+    try {
+      const res  = await fetch('/api/sync')
+      const data = await res.json()
+      if (data.state?.last_synced_at) setLastSynced(data.state.last_synced_at)
+      if (data.state?.is_syncing)     setState('blocked')
+    } catch { /* ignore */ }
   }
 
   async function triggerSync() {
-    setSyncing(true); setMessage(null)
+    if (state === 'syncing' || state === 'blocked') return
+    setState('syncing'); setError(null); setSummary(null)
+
+    const steps = [
+      'Connecting to Gmail…',
+      'Fetching email threads…',
+      'Running AI analysis…',
+      'Extracting contacts…',
+      'Detecting deal signals…',
+      'Linking calendar events…',
+      'Updating pipeline…',
+    ]
+    let stepIdx = 0
+    setProgress(steps[0])
+    const ticker = setInterval(() => {
+      stepIdx = Math.min(stepIdx + 1, steps.length - 1)
+      setProgress(steps[stepIdx])
+    }, 2500)
+
     try {
       const res  = await fetch('/api/sync', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ mode: 'incremental' }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trigger: 'manual' }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      setMessage(`${data.processed} threads · ${data.saved} new deals`)
+      clearInterval(ticker)
+
+      if (res.status === 409) {
+        setState('blocked')
+        setError(data.error)
+        return
+      }
+      if (!res.ok) throw new Error(data.error || 'Sync failed')
+
+      setSummary({ processed: data.processed, deals: data.deals, contacts: data.contacts })
       setLastSynced(new Date().toISOString())
-      // Reload page to show new data
+      setState('done')
+      setTimeout(() => { setState('idle'); setSummary(null) }, 6000)
       window.location.reload()
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Sync failed')
-    } finally {
-      setSyncing(false)
+      clearInterval(ticker)
+      setError(err instanceof Error ? err.message : 'Sync failed')
+      setState('idle')
     }
   }
 
-  const timeAgo = lastSynced
-    ? formatTimeAgo(new Date(lastSynced))
-    : 'Never synced'
+  const timeAgo = lastSynced ? formatTimeAgo(new Date(lastSynced)) : 'Never synced'
 
   return (
-    <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)' }}>
-      <button
-        onClick={triggerSync}
-        disabled={syncing}
+    <div style={{ padding: '10px 20px', borderTop: '1px solid var(--border)' }}>
+      {/* Progress message */}
+      {state === 'syncing' && (
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--amber)', marginBottom: 6, lineHeight: 1.5 }}>
+          {progress}
+        </div>
+      )}
+
+      {/* Summary after sync */}
+      {summary && state === 'done' && (
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--green)', marginBottom: 6, lineHeight: 1.6 }}>
+          ✓ {summary.processed} threads · {summary.deals} deals · {summary.contacts} contacts
+        </div>
+      )}
+
+      {/* Error */}
+      {error && (
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--red)', marginBottom: 6, lineHeight: 1.5 }}>
+          {error}
+        </div>
+      )}
+
+      <button onClick={triggerSync} disabled={state === 'syncing' || state === 'blocked'}
         style={{
-          width:'100%', display:'flex', alignItems:'center', justifyContent:'center', gap:6,
-          padding:'8px 12px', background:'transparent',
-          border:'1px solid var(--border2)', borderRadius:8,
-          fontFamily:'var(--sans)', fontSize:11, fontWeight:500,
-          color: syncing ? 'var(--muted)' : 'var(--text)',
-          cursor: syncing ? 'not-allowed' : 'pointer',
-          transition:'all .15s',
-        }}
-        onMouseOver={e => { if (!syncing) { e.currentTarget.style.borderColor='var(--accent)'; e.currentTarget.style.color='var(--accent)' }}}
-        onMouseOut={e  => { e.currentTarget.style.borderColor='var(--border2)'; e.currentTarget.style.color='var(--text)' }}
-      >
-        {syncing
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          padding: '7px 10px',
+          background: 'transparent',
+          border: `1px solid ${state === 'done' ? 'var(--green)' : 'var(--border2)'}`,
+          borderRadius: 8,
+          fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500,
+          color: state === 'syncing' || state === 'blocked' ? 'var(--muted)' : state === 'done' ? 'var(--green)' : 'var(--text)',
+          cursor: state === 'syncing' || state === 'blocked' ? 'not-allowed' : 'pointer',
+          transition: 'all .15s',
+        }}>
+        {state === 'syncing'
           ? <><Spinner />Syncing…</>
-          : <><SyncIcon />Sync Gmail now</>
+          : state === 'blocked'
+          ? '⏳ Sync in progress'
+          : state === 'done'
+          ? '✓ Synced'
+          : <>↺ Sync Gmail now</>
         }
       </button>
-      <div style={{ fontFamily:'var(--mono)', fontSize:9, color:'var(--muted)', marginTop:6, textAlign:'center' }}>
-        {message ?? timeAgo}
+
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--muted)', marginTop: 5, textAlign: 'center' }}>
+        {timeAgo}
       </div>
     </div>
   )
@@ -77,18 +127,19 @@ function formatTimeAgo(date: Date): string {
   if (mins < 1)  return 'Just synced'
   if (mins < 60) return `Synced ${mins}m ago`
   const hrs = Math.floor(mins / 60)
-  return `Synced ${hrs}h ago`
+  if (hrs < 24)  return `Synced ${hrs}h ago`
+  return `Synced ${Math.floor(hrs / 24)}d ago`
 }
 
 function Spinner() {
-  return <div style={{ width:12, height:12, border:'1.5px solid var(--border2)', borderTopColor:'var(--accent)', borderRadius:'50%', animation:'spin .7s linear infinite' }} />
-}
-
-function SyncIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-      <path d="M1.5 7A5.5 5.5 0 0 1 12 4.5M12.5 7A5.5 5.5 0 0 1 2 9.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-      <path d="M10 2.5l2 2-2 2M4 7.5l-2 2 2 2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
+    <div style={{
+      width: 10, height: 10,
+      border: '1.5px solid var(--border2)',
+      borderTopColor: 'var(--accent)',
+      borderRadius: '50%',
+      animation: 'spin .7s linear infinite',
+      flexShrink: 0,
+    }} />
   )
 }

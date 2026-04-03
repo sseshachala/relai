@@ -31,3 +31,19 @@ body {
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
 }
+
+/* ── Animations ─────────────────────────────────────────────────── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Extra colour tokens ────────────────────────────────────────── */
+:root {
+  --green-dim:  rgba(26, 158, 106, 0.12);
+  --red-dim:    rgba(212, 68,  68,  0.12);
+  --amber-dim:  rgba(197, 122, 16,  0.12);
+  --accent-dim: rgba(42,  92,  255, 0.10);
+  --bg2:        #f0ede8;
+  --border2:    #d4d2cc;
+  --serif:      Georgia, 'Times New Roman', serif;
+}

@@ -1,6 +1,12 @@
-// Gmail + Google Calendar API helpers
-// The access token comes from Supabase — it's stored automatically
-// when the user signs in with Google OAuth
+// ── Types ─────────────────────────────────────────────────────────────
+export interface EmailMessage {
+  id:      string
+  from:    string
+  to:      string
+  date:    string
+  subject: string
+  body:    string
+}
 
 export interface EmailThread {
   id:       string
@@ -9,182 +15,162 @@ export interface EmailThread {
   messages: EmailMessage[]
 }
 
-export interface EmailMessage {
-  from:    string
-  to:      string
-  date:    string
-  body:    string
-}
-
-export interface CalendarEvent {
-  id:       string
-  title:    string
-  start:    string
-  end:      string
+export interface GCalEvent {
+  id:        string
+  title:     string
+  start:     string
+  end:       string
   attendees: string[]
 }
 
-// ── Fetch last N email threads ────────────────────────────────────────
-export async function fetchRecentThreads(
-  accessToken: string,
-  maxThreads  = 10
-): Promise<EmailThread[]> {
-
-  // Step 1 — get thread IDs (exclude newsletters, notifications)
-  const listRes = await fetch(
-    `https://gmail.googleapis.com/gmail/v1/users/me/threads?maxResults=${maxThreads}&q=-category:promotions -category:social -category:updates`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  )
-
-  if (!listRes.ok) throw new Error('Gmail API error: ' + listRes.status)
-  const listData = await listRes.json()
-  const threads  = listData.threads ?? []
-
-  // Step 2 — fetch each thread in parallel (capped at 10)
-  const threadDetails = await Promise.all(
-    threads.slice(0, maxThreads).map((t: { id: string }) =>
-      fetchThread(accessToken, t.id)
-    )
-  )
-
-  return threadDetails.filter(Boolean) as EmailThread[]
+// ── Helpers ───────────────────────────────────────────────────────────
+function header(headers: { name: string; value: string }[], name: string) {
+  return headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value ?? ''
 }
 
-// ── Fetch a single thread with all messages ───────────────────────────
-export async function fetchThread(
-  accessToken: string,
-  threadId:    string
-): Promise<EmailThread | null> {
+function decodeBody(data: string) {
+  return Buffer.from(data.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8')
+}
+
+function extractBody(payload: {
+  mimeType?: string
+  body?: { data?: string }
+  parts?: { mimeType?: string; body?: { data?: string } }[]
+}): string {
+  if (payload.body?.data) return decodeBody(payload.body.data)
+  if (payload.parts) {
+    const text = payload.parts.find(p => p.mimeType === 'text/plain')
+    if (text?.body?.data) return decodeBody(text.body.data)
+    const html = payload.parts.find(p => p.mimeType === 'text/html')
+    if (html?.body?.data) return decodeBody(html.body.data).replace(/<[^>]+>/g, ' ')
+  }
+  return ''
+}
+
+// ── Fetch a single thread ─────────────────────────────────────────────
+export async function fetchThread(accessToken: string, threadId: string): Promise<EmailThread | null> {
+  const res = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}?format=full`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  )
+  if (!res.ok) return null
+  const data = await res.json()
+
+  const messages = (data.messages ?? []).map((msg: {
+    id: string
+    payload: { headers: { name: string; value: string }[]; body?: { data?: string }; parts?: { mimeType?: string; body?: { data?: string } }[] }
+    internalDate: string
+  }) => {
+    const h = msg.payload.headers
+    return {
+      id:      msg.id,
+      from:    header(h, 'From'),
+      to:      header(h, 'To'),
+      date:    new Date(parseInt(msg.internalDate)).toISOString(),
+      subject: header(h, 'Subject'),
+      body:    extractBody(msg.payload).slice(0, 3000),
+    }
+  })
+
+  return {
+    id:       data.id,
+    subject:  messages[0]?.subject ?? '',
+    snippet:  data.snippet ?? '',
+    messages,
+  }
+}
+
+// ── Fetch N most recent threads ───────────────────────────────────────
+export async function fetchRecentThreads(accessToken: string, limit = 10): Promise<EmailThread[]> {
+  const res = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/threads?maxResults=${limit}&labelIds=INBOX`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  )
+  if (!res.ok) return []
+  const data = await res.json()
+  const ids: string[] = (data.threads ?? []).map((t: { id: string }) => t.id)
+
+  const threads = await Promise.all(
+    Array.from(ids).slice(0, limit).map(id => fetchThread(accessToken, id))
+  )
+  return threads.filter(Boolean) as EmailThread[]
+}
+
+// ── Fetch only new threads since a history checkpoint ─────────────────
+export async function fetchNewThreadsSince(accessToken: string, historyId: string): Promise<EmailThread[]> {
   try {
     const res = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}?format=full`,
+      `https://gmail.googleapis.com/gmail/v1/users/me/history?startHistoryId=${historyId}&historyTypes=messageAdded&labelId=INBOX`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    )
+    if (!res.ok) return []
+    const data = await res.json()
+
+    const threadIdSet = new Set<string>()
+    for (const h of data.history ?? []) {
+      for (const ma of h.messagesAdded ?? []) {
+        if (ma.message?.threadId) threadIdSet.add(ma.message.threadId)
+      }
+    }
+
+    if (!threadIdSet.size) return []
+    const threads = await Promise.all(
+      Array.from(threadIdSet).slice(0, 50).map(id => fetchThread(accessToken, id))
+    )
+    return threads.filter(Boolean) as EmailThread[]
+  } catch {
+    return []
+  }
+}
+
+// ── Get current history ID (checkpoint for next incremental sync) ─────
+export async function getHistoryId(accessToken: string): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/profile`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     )
     if (!res.ok) return null
     const data = await res.json()
-
-    const messages: EmailMessage[] = (data.messages ?? []).map((msg: any) => {
-      const headers = msg.payload?.headers ?? []
-      const get     = (name: string) => headers.find((h: any) => h.name.toLowerCase() === name.toLowerCase())?.value ?? ''
-
-      return {
-        from: get('From'),
-        to:   get('To'),
-        date: get('Date'),
-        body: extractBody(msg.payload),
-      }
-    })
-
-    // Build subject from first message
-    const firstHeaders = data.messages?.[0]?.payload?.headers ?? []
-    const subject = firstHeaders.find((h: any) => h.name.toLowerCase() === 'subject')?.value ?? '(no subject)'
-
-    return {
-      id:       threadId,
-      subject,
-      snippet:  data.snippet ?? '',
-      messages,
-    }
+    return data.historyId ?? null
   } catch {
     return null
   }
 }
 
-// ── Flatten thread into a plain text string for Claude ────────────────
+// ── Convert thread to plain text for Claude ───────────────────────────
 export function threadToText(thread: EmailThread): string {
   return thread.messages.map(m =>
-    `From: ${m.from}\nTo: ${m.to}\nDate: ${m.date}\nSubject: ${thread.subject}\n\n${m.body}`
+    `From: ${m.from}\nTo: ${m.to}\nDate: ${m.date}\nSubject: ${m.subject}\n\n${m.body}`
   ).join('\n\n---\n\n')
 }
 
-// ── Fetch upcoming calendar events ────────────────────────────────────
-export async function fetchCalendarEvents(
-  accessToken: string,
-  maxEvents   = 10
-): Promise<CalendarEvent[]> {
-  const now     = new Date().toISOString()
-  const oneWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+// ── Fetch calendar events ─────────────────────────────────────────────
+export async function fetchCalendarEvents(accessToken: string, maxResults = 20): Promise<GCalEvent[]> {
+  try {
+    const now    = new Date().toISOString()
+    const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    const res = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${now}&timeMax=${future}&maxResults=${maxResults}&singleEvents=true&orderBy=startTime`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    )
+    if (!res.ok) return []
+    const data = await res.json()
 
-  const res = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${now}&timeMax=${oneWeek}&maxResults=${maxEvents}&singleEvents=true&orderBy=startTime`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  )
-
-  if (!res.ok) return []
-  const data = await res.json()
-
-  return (data.items ?? []).map((e: any) => ({
-    id:        e.id,
-    title:     e.summary ?? '(no title)',
-    start:     e.start?.dateTime ?? e.start?.date ?? '',
-    end:       e.end?.dateTime   ?? e.end?.date   ?? '',
-    attendees: (e.attendees ?? []).map((a: any) => a.email).filter(Boolean),
-  }))
-}
-
-// ── Get Gmail history ID for incremental sync ─────────────────────────
-export async function getHistoryId(accessToken: string): Promise<string | null> {
-  const res = await fetch(
-    'https://gmail.googleapis.com/gmail/v1/users/me/profile',
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  )
-  if (!res.ok) return null
-  const data = await res.json()
-  return data.historyId ?? null
-}
-
-// ── Fetch only new threads since last sync ────────────────────────────
-export async function fetchNewThreadsSince(
-  accessToken:     string,
-  sinceHistoryId:  string
-): Promise<EmailThread[]> {
-  const res = await fetch(
-    `https://gmail.googleapis.com/gmail/v1/users/me/history?startHistoryId=${sinceHistoryId}&historyTypes=messageAdded`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  )
-
-  if (!res.ok) return []
-  const data = await res.json()
-
-  // Extract unique thread IDs from history
-  const threadIds = new Set<string>()
-  for (const record of data.history ?? []) {
-    for (const msg of record.messagesAdded ?? []) {
-      if (msg.message?.threadId) threadIds.add(msg.message.threadId)
-    }
+    return (data.items ?? []).map((e: {
+      id: string
+      summary?: string
+      start: { dateTime?: string; date?: string }
+      end:   { dateTime?: string; date?: string }
+      attendees?: { email: string }[]
+    }) => ({
+      id:        e.id,
+      title:     e.summary ?? '(No title)',
+      start:     e.start.dateTime ?? e.start.date ?? '',
+      end:       e.end.dateTime   ?? e.end.date   ?? '',
+      attendees: (e.attendees ?? []).map((a: { email: string }) => a.email).filter(Boolean),
+    }))
+  } catch {
+    return []
   }
-
-  const threads = await Promise.all(
-    Array.from(threadIds).slice(0, 20).map(id => fetchThread(accessToken, id))
-  )
-
-  return threads.filter(Boolean) as EmailThread[]
-}
-
-// ── Extract plain text body from Gmail message payload ────────────────
-function extractBody(payload: any): string {
-  if (!payload) return ''
-
-  // Direct text/plain part
-  if (payload.mimeType === 'text/plain' && payload.body?.data) {
-    return Buffer.from(payload.body.data, 'base64').toString('utf-8').slice(0, 3000)
-  }
-
-  // Search parts recursively
-  if (payload.parts) {
-    for (const part of payload.parts) {
-      if (part.mimeType === 'text/plain' && part.body?.data) {
-        return Buffer.from(part.body.data, 'base64').toString('utf-8').slice(0, 3000)
-      }
-    }
-    // Fallback to HTML part if no plain text
-    for (const part of payload.parts) {
-      if (part.mimeType === 'text/html' && part.body?.data) {
-        const html = Buffer.from(part.body.data, 'base64').toString('utf-8')
-        return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 3000)
-      }
-    }
-  }
-
-  return payload.snippet ?? ''
 }
