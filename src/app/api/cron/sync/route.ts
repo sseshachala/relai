@@ -238,8 +238,8 @@ async function runSyncForUser(
       const { data: contacts } = await supabase.from('contacts').select('name,company,sentiment,last_topic').eq('user_id', userId).order('created_at', { ascending: false }).limit(15)
       if (deals?.length || contacts?.length) {
         const digest = await generateDigest({
-          deals:    (deals ?? []).map(d => ({ stage: d.deal_stage, urgency: d.urgency, next_action: d.next_action, summary: d.summary || '', contact: '', company: '' })),
-          contacts: (contacts ?? []).map(c => ({ name: c.name, company: c.company, sentiment: c.sentiment, last_topic: c.last_topic })),
+          deals:    (deals ?? []).map((d: Record<string, unknown>) => ({ stage: d.deal_stage as string | null, urgency: d.urgency as string | null, next_action: d.next_action as string | null, summary: (d.summary as string) || '', contact: '', company: '' })),
+          contacts: (contacts ?? []).map((c: Record<string, unknown>) => ({ name: c.name as string | null, company: c.company as string | null, sentiment: c.sentiment as string | null, last_topic: c.last_topic as string | null })),
         })
         await supabase.from('digests').insert({ user_id: userId, content: digest, trigger: 'cron' })
       }
