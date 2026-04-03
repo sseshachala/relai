@@ -146,7 +146,7 @@ export default function SyncSettings({
             <span style={label}>Look back</span>
             <select
               value={config.lookback_days}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfig((c: typeof config) => ({ ...c, lookback_days: +e.target.value }))}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setConfig((c: typeof config) => ({ ...c, lookback_days: +e.target.value }))}
               style={selectStyle}
             >
               <option value={7}>Last 7 days</option>
@@ -160,7 +160,7 @@ export default function SyncSettings({
             <span style={label}>Threads per sync</span>
             <select
               value={config.max_threads}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfig((c: typeof config) => ({ ...c, max_threads: +e.target.value }))}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setConfig((c: typeof config) => ({ ...c, max_threads: +e.target.value }))}
               style={selectStyle}
             >
               <option value={5}>5 threads</option>
@@ -173,7 +173,7 @@ export default function SyncSettings({
             <span style={label}>Sync frequency</span>
             <select
               value={config.schedule_mins}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfig((c: typeof config) => ({ ...c, schedule_mins: +e.target.value }))}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setConfig((c: typeof config) => ({ ...c, schedule_mins: +e.target.value }))}
               style={selectStyle}
             >
               <option value={15}>Every 15 minutes</option>
