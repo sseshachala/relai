@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/layout/Sidebar'
 import PipelineBoard from './PipelineBoard'
 
+export const dynamic = 'force-dynamic'
+
 export default async function PipelinePage() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()

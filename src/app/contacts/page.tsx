@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/layout/Sidebar'
 
+export const dynamic = 'force-dynamic'
+
 export default async function ContactsPage() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()

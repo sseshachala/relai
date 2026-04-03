@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/layout/Sidebar'
 import AnalyseForm from './AnalyseForm'
 
+export const dynamic = 'force-dynamic'
+
 export default async function AnalysePage() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
