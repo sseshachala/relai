@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/layout/Sidebar'
 import MeetingsClient from './MeetingsClient'
+import type { CalendarEvent } from '@/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,7 +38,7 @@ export default async function MeetingsPage() {
           <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-.02em' }}>Meetings</h1>
           <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 3 }}>Today and next 48 hours — with email context automatically linked.</p>
         </div>
-        <MeetingsClient events={enriched} />
+        <MeetingsClient events={enriched as unknown as CalendarEvent[]} />
       </main>
     </div>
   )
