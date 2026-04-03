@@ -4,6 +4,10 @@ import { fetchRecentThreads, fetchNewThreadsSince, threadToText, getHistoryId } 
 import { analyseThread } from '@/lib/claude'
 import { unstable_noStore as noStore } from 'next/cache'
 
+
+type SnapRow  = { id: string; thread_id: string; participants: string[] }
+type EventRow = { id: string; attendee_emails: string[] | null; linked_thread_ids: string[] | null }
+
 export async function GET() {
   noStore()
   const supabase = createClient()
