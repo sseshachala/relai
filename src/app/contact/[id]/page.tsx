@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/layout/Sidebar'
 import Link from 'next/link'
+import DealRow from './DealRow'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,7 +11,7 @@ const SENT_BG:    Record<string, string> = { positive: 'var(--green-dim)', neutr
 
 function initials(name: string | null) {
   if (!name) return '?'
-  return name.trim().split(/\s+/).map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
+  return name.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2)
 }
 
 export default async function ContactPage({ params }: { params: { id: string } }) {
@@ -26,7 +27,6 @@ export default async function ContactPage({ params }: { params: { id: string } }
 
   if (!contact) notFound()
 
-  // Find deals where this contact's email appears in thread participants
   const relatedDeals = (deals ?? []).filter(d => {
     if (!contact.email) return false
     return d.thread_text?.toLowerCase().includes(contact.email.toLowerCase())
@@ -40,7 +40,6 @@ export default async function ContactPage({ params }: { params: { id: string } }
       <Sidebar dealCount={deals?.length ?? 0} contactCount={contacts?.length ?? 0} />
       <main style={{ marginLeft: 210, flex: 1, padding: '30px 34px' }}>
 
-        {/* Breadcrumb */}
         <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--muted)' }}>
           <Link href="/contacts" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Contacts</Link>
           <span>›</span>
@@ -48,8 +47,7 @@ export default async function ContactPage({ params }: { params: { id: string } }
         </div>
 
         <div style={{ maxWidth: 680 }}>
-
-          {/* Contact header */}
+          {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
             <div style={{ width: 52, height: 52, borderRadius: 14, background: 'var(--accent-dim)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700, flexShrink: 0 }}>
               {initials(contact.name)}
@@ -65,14 +63,14 @@ export default async function ContactPage({ params }: { params: { id: string } }
             </span>
           </div>
 
-          {/* Meta */}
+          {/* Meta grid */}
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px', marginBottom: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               {[
                 { label: 'First seen', value: dateStr },
-                { label: 'Sentiment', value: sent },
-                { label: 'Company',   value: contact.company ?? '—' },
-                { label: 'Role',      value: contact.role ?? '—' },
+                { label: 'Sentiment',  value: sent },
+                { label: 'Company',    value: contact.company ?? '—' },
+                { label: 'Role',       value: contact.role    ?? '—' },
               ].map(f => (
                 <div key={f.label}>
                   <div style={{ fontFamily: 'var(--mono)', fontSize: 9, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 3 }}>{f.label}</div>
@@ -90,7 +88,7 @@ export default async function ContactPage({ params }: { params: { id: string } }
             </div>
           )}
 
-          {/* Related deals */}
+          {/* Related deals — uses client component for hover */}
           <div style={{ marginBottom: 14 }}>
             <div style={{ fontFamily: 'var(--mono)', fontSize: 9, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 10 }}>
               Deal history ({relatedDeals.length})
@@ -100,22 +98,13 @@ export default async function ContactPage({ params }: { params: { id: string } }
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {relatedDeals.map(d => (
-                  <Link key={d.id} href={`/deal/${d.id}`} style={{ textDecoration: 'none' }}>
-                    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', transition: 'border-color .15s' }}
-                      onMouseOver={(e: React.MouseEvent<HTMLDivElement>) => (e.currentTarget.style.borderColor = 'var(--accent)')}
-                      onMouseOut={(e: React.MouseEvent<HTMLDivElement>)  => (e.currentTarget.style.borderColor = 'var(--border)')}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>{d.summary?.slice(0, 60) || 'Deal'}</div>
-                        <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--muted)' }}>
-                          {new Date(d.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        </div>
-                      </div>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: 10, padding: '2px 8px', borderRadius: 20, background: 'var(--bg2)', color: 'var(--muted)' }}>
-                        {d.deal_stage ?? '—'}
-                      </span>
-                      <span style={{ color: 'var(--accent)', fontSize: 12 }}>→</span>
-                    </div>
-                  </Link>
+                  <DealRow
+                    key={d.id}
+                    id={d.id}
+                    summary={d.summary}
+                    deal_stage={d.deal_stage}
+                    created_at={d.created_at}
+                  />
                 ))}
               </div>
             )}
