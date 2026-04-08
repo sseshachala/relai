@@ -31,9 +31,9 @@ export default async function ContactPage({ params }: { params: { id: string } }
   if (!contact) notFound()
 
   type DealRow = { id: string; summary: string | null; deal_stage: string | null; urgency: string | null; created_at: string }
-  const relatedDeals: DealRow[] = (dealLinks ?? [])
-    .map((dl: { role: string; deals: DealRow | null }) => dl.deals)
-    .filter((d: DealRow | null): d is DealRow => d !== null)
+  type DealLink = { role: string; deals: DealRow[] }
+  const relatedDeals: DealRow[] = ((dealLinks ?? []) as unknown as DealLink[])
+    .flatMap((dl: DealLink) => dl.deals ?? [])
 
   const sent    = contact.sentiment ?? 'neutral'
   const dateStr = new Date(contact.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
