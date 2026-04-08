@@ -1,5 +1,5 @@
 // ── Deal ──────────────────────────────────────────────────────────────
-export type DealStage = 'prospect' | 'active' | 'stalled' | 'closed'
+export type DealStage = 'prospect' | 'active' | 'stalled' | 'closed' | 'dead'
 export type Urgency   = 'high' | 'medium' | 'low'
 export type Sentiment = 'positive' | 'neutral' | 'negative'
 
@@ -28,6 +28,20 @@ export interface Deal extends DealAnalysis {
   thread_id:    string | null
   thread_text:  string | null
   created_at:   string
+}
+
+
+export interface DealContact {
+  id:         string
+  deal_id:    string
+  contact_id: string
+  role:       'primary' | 'stakeholder' | 'cc'
+  created_at: string
+  contact?:   Contact
+}
+
+export interface DealWithContacts extends Deal {
+  deal_contacts?: DealContact[]
 }
 
 export interface Contact {

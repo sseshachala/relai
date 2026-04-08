@@ -19,20 +19,21 @@ export default async function ContactPage({ params }: { params: { id: string } }
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  type DealRow = { id: string; summary: string | null; deal_stage: string | null; created_at: string; thread_text: string | null }
-
-  const [{ data: contact }, { data: deals }, { data: contacts }] = await Promise.all([
+  const [{ data: contact }, { data: allContacts }, { data: dealLinks }] = await Promise.all([
     supabase.from('contacts').select('*').eq('id', params.id).eq('user_id', user.id).single(),
-    supabase.from('deals').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
     supabase.from('contacts').select('id').eq('user_id', user.id),
+    supabase.from('deal_contacts')
+      .select('role, deals(id, summary, deal_stage, urgency, created_at)')
+      .eq('contact_id', params.id),
   ])
+  const contacts = allContacts
 
   if (!contact) notFound()
 
-  const relatedDeals = (deals as DealRow[] ?? []).filter((d: DealRow) => {
-    if (!contact.email) return false
-    return (d.thread_text ?? '').toLowerCase().includes(contact.email.toLowerCase())
-  })
+  type DealRow = { id: string; summary: string | null; deal_stage: string | null; urgency: string | null; created_at: string }
+  const relatedDeals: DealRow[] = (dealLinks ?? [])
+    .map((dl: { role: string; deals: DealRow | null }) => dl.deals)
+    .filter((d: DealRow | null): d is DealRow => d !== null)
 
   const sent    = contact.sentiment ?? 'neutral'
   const dateStr = new Date(contact.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })

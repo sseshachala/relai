@@ -122,8 +122,29 @@ export async function POST(req: NextRequest) {
         // Run AI analysis
         const analysis = await analyseThread(threadText)
 
+        // Save contacts first so we can link them to deals
+        let newContacts = 0
+        const savedContactIds: string[] = []
+        for (const contact of analysis.contacts) {
+          if (!contact.name && !contact.email) continue
+          const { data: savedContact, error } = await supabase.from('contacts').upsert({
+            user_id:    userId,
+            name:       contact.name,
+            email:      contact.email,
+            company:    contact.company,
+            role:       contact.role,
+            sentiment:  analysis.sentiment,
+            last_topic: contact.last_topic,
+          }, { onConflict: 'user_id,email', ignoreDuplicates: false }).select('id').single()
+          if (!error && savedContact) {
+            savedContactIds.push(savedContact.id)
+            newContacts++
+          }
+        }
+        contactsFound += newContacts
+
         if (analysis.is_deal) {
-          await supabase.from('deals').upsert({
+          const { data: savedDeal } = await supabase.from('deals').upsert({
             user_id:     userId,
             thread_id:   thread.id,
             thread_text: threadText.slice(0, 2000),
@@ -134,25 +155,20 @@ export async function POST(req: NextRequest) {
             sentiment:   analysis.sentiment,
             next_action: analysis.next_action,
             summary:     analysis.summary,
-          }, { onConflict: 'user_id,thread_id' })
+          }, { onConflict: 'user_id,thread_id' }).select('id').single()
+
+          // Auto-link contacts to this deal
+          if (savedDeal && savedContactIds.length) {
+            const links = savedContactIds.map((contactId, i) => ({
+              deal_id:    savedDeal.id,
+              contact_id: contactId,
+              role:       i === 0 ? 'primary' : 'stakeholder',
+            }))
+            await supabase.from('deal_contacts')
+              .upsert(links, { onConflict: 'deal_id,contact_id' })
+          }
           dealsFound++
         }
-
-        let newContacts = 0
-        for (const contact of analysis.contacts) {
-          if (!contact.name && !contact.email) continue
-          const { error } = await supabase.from('contacts').upsert({
-            user_id:    userId,
-            name:       contact.name,
-            email:      contact.email,
-            company:    contact.company,
-            role:       contact.role,
-            sentiment:  analysis.sentiment,
-            last_topic: contact.last_topic,
-          }, { onConflict: 'user_id,email', ignoreDuplicates: false })
-          if (!error) newContacts++
-        }
-        contactsFound += newContacts
 
       } catch (threadErr) {
         hadErrors = true
