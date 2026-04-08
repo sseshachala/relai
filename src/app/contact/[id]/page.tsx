@@ -14,25 +14,26 @@ function initials(name: string | null) {
   return name.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2)
 }
 
+type DealRowType = { id: string; summary: string | null; deal_stage: string | null; urgency: string | null; created_at: string }
+type DealLink    = { role: string; deals: DealRowType[] }
+
 export default async function ContactPage({ params }: { params: { id: string } }) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [{ data: contact }, { data: allContacts }, { data: dealLinks }] = await Promise.all([
+  const [{ data: contact }, { data: allContacts }, { data: allDeals }, { data: dealLinks }] = await Promise.all([
     supabase.from('contacts').select('*').eq('id', params.id).eq('user_id', user.id).single(),
     supabase.from('contacts').select('id').eq('user_id', user.id),
+    supabase.from('deals').select('id').eq('user_id', user.id),
     supabase.from('deal_contacts')
       .select('role, deals(id, summary, deal_stage, urgency, created_at)')
       .eq('contact_id', params.id),
   ])
-  const contacts = allContacts
 
   if (!contact) notFound()
 
-  type DealRow = { id: string; summary: string | null; deal_stage: string | null; urgency: string | null; created_at: string }
-  type DealLink = { role: string; deals: DealRow[] }
-  const relatedDeals: DealRow[] = ((dealLinks ?? []) as unknown as DealLink[])
+  const relatedDeals: DealRowType[] = ((dealLinks ?? []) as unknown as DealLink[])
     .flatMap((dl: DealLink) => dl.deals ?? [])
 
   const sent    = contact.sentiment ?? 'neutral'
@@ -40,7 +41,7 @@ export default async function ContactPage({ params }: { params: { id: string } }
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <Sidebar dealCount={deals?.length ?? 0} contactCount={contacts?.length ?? 0} />
+      <Sidebar dealCount={allDeals?.length ?? 0} contactCount={allContacts?.length ?? 0} />
       <main style={{ marginLeft: 210, flex: 1, padding: '30px 34px' }}>
 
         <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--muted)' }}>
@@ -91,22 +92,24 @@ export default async function ContactPage({ params }: { params: { id: string } }
             </div>
           )}
 
-          {/* Related deals — uses client component for hover */}
+          {/* Related deals */}
           <div style={{ marginBottom: 14 }}>
             <div style={{ fontFamily: 'var(--mono)', fontSize: 9, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 10 }}>
               Deal history ({relatedDeals.length})
             </div>
             {relatedDeals.length === 0 ? (
-              <p style={{ fontSize: 13, color: 'var(--muted)' }}>No deals found involving this contact.</p>
+              <p style={{ fontSize: 13, color: 'var(--muted)' }}>No deals linked to this contact yet.</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {relatedDeals.map((d: DealRow) => <DealRow
-                  key={d.id ?? ''}
-                  id={d.id ?? ''}
-                  summary={d.summary ?? null}
-                  deal_stage={d.deal_stage ?? null}
-                  created_at={d.created_at ?? ''}
-                />)}
+                {relatedDeals.map((d: DealRowType) => (
+                  <DealRow
+                    key={d.id}
+                    id={d.id}
+                    summary={d.summary}
+                    deal_stage={d.deal_stage}
+                    created_at={d.created_at}
+                  />
+                ))}
               </div>
             )}
           </div>
