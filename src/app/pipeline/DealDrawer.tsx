@@ -1,18 +1,24 @@
 'use client'
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Deal, Contact, DealStage, Urgency } from '@/types'
 
 interface LinkedContact {
-  id:   string
-  role: 'primary' | 'stakeholder' | 'cc'
+  id:       string
+  role:     'primary' | 'stakeholder' | 'cc'
   contacts: { id: string; name: string | null; email: string | null; company: string | null } | null
 }
 
+interface NewContactForm {
+  name:    string
+  email:   string
+  company: string
+}
+
 interface Props {
-  deal:       Deal | null          // null = new deal
-  contacts:   Contact[]
-  onClose:    () => void
-  onSaved:    () => void
+  deal:     Deal | null
+  contacts: Contact[]
+  onClose:  () => void
+  onSaved:  () => void
 }
 
 const STAGES: { value: DealStage; label: string; color: string }[] = [
@@ -29,18 +35,33 @@ const URGENCIES: { value: Urgency; label: string }[] = [
   { value: 'low',    label: 'Low'    },
 ]
 
+type LinkedId = { id: string; role: 'primary' | 'stakeholder' | 'cc' }
+
 export default function DealDrawer({ deal, contacts, onClose, onSaved }: Props) {
   const isNew = !deal
 
-  const [summary,     setSummary]     = useState(deal?.summary     ?? '')
-  const [stage,       setStage]       = useState<DealStage>(deal?.deal_stage ?? 'prospect')
-  const [urgency,     setUrgency]     = useState<Urgency>(deal?.urgency     ?? 'medium')
-  const [nextAction,  setNextAction]  = useState(deal?.next_action  ?? '')
-  const [linkedIds,   setLinkedIds]   = useState<{ id: string; role: 'primary'|'stakeholder'|'cc' }[]>([])
-  const [search,      setSearch]      = useState('')
-  const [saving,      setSaving]      = useState(false)
-  const [error,       setError]       = useState<string | null>(null)
-  const [showDelete,  setShowDelete]  = useState(false)
+  // Deal fields
+  const [summary,    setSummary]    = useState(deal?.summary    ?? '')
+  const [stage,      setStage]      = useState<DealStage>(deal?.deal_stage ?? 'prospect')
+  const [urgency,    setUrgency]    = useState<Urgency>(deal?.urgency     ?? 'medium')
+  const [nextAction, setNextAction] = useState(deal?.next_action ?? '')
+
+  // Contact linking
+  const [linkedIds,  setLinkedIds]  = useState<LinkedId[]>([])
+  const [search,     setSearch]     = useState('')
+
+  // Inline new contact form
+  const [showNewForm,  setShowNewForm]  = useState(false)
+  const [newContact,   setNewContact]   = useState<NewContactForm>({ name: '', email: '', company: '' })
+  const [creatingContact, setCreatingContact] = useState(false)
+
+  // All contacts includes freshly created ones
+  const [allContacts, setAllContacts] = useState<Contact[]>(contacts)
+
+  // UI state
+  const [saving,     setSaving]     = useState(false)
+  const [error,      setError]      = useState<string | null>(null)
+  const [showDelete, setShowDelete] = useState(false)
 
   // Load existing linked contacts for edit mode
   useEffect(() => {
@@ -49,35 +70,81 @@ export default function DealDrawer({ deal, contacts, onClose, onSaved }: Props) 
       .then(r => r.json())
       .then(data => {
         if (data.contacts) {
-          setLinkedIds(data.contacts.map((c: LinkedContact) => ({
-            id:   c.contacts?.id ?? '',
-            role: c.role,
-          })).filter((c: { id: string }) => c.id))
+          setLinkedIds(
+            data.contacts
+              .map((c: LinkedContact) => ({ id: c.contacts?.id ?? '', role: c.role }))
+              .filter((c: LinkedId) => c.id)
+          )
         }
       })
       .catch(() => {})
   }, [deal])
 
-  const filteredContacts = contacts.filter(c => {
-    if (linkedIds.find((l: { id: string }) => l.id === c.id)) return false
+  // Pre-fill new contact name from search when switching to create mode
+  function openNewContactForm() {
+    setNewContact({ name: search, email: '', company: '' })
+    setShowNewForm(true)
+  }
+
+  function cancelNewContact() {
+    setShowNewForm(false)
+    setNewContact({ name: '', email: '', company: '' })
+  }
+
+  const filteredContacts = allContacts.filter((c: Contact) => {
+    if (linkedIds.find((l: LinkedId) => l.id === c.id)) return false
     const q = search.toLowerCase()
     return (c.name ?? '').toLowerCase().includes(q)
         || (c.email ?? '').toLowerCase().includes(q)
         || (c.company ?? '').toLowerCase().includes(q)
   }).slice(0, 8)
 
-  function addContact(c: Contact) {
-    const role = linkedIds.length === 0 ? 'primary' : 'stakeholder'
-    setLinkedIds((prev: { id: string; role: "primary"|"stakeholder"|"cc" }[]) => [...prev, { id: c.id, role }])
+  function addContactById(id: string) {
+    const role: 'primary' | 'stakeholder' = linkedIds.length === 0 ? 'primary' : 'stakeholder'
+    setLinkedIds((prev: LinkedId[]) => [...prev, { id, role }])
     setSearch('')
+    setShowNewForm(false)
+  }
+
+  function addContact(c: Contact) {
+    // Add to allContacts if new
+    if (!allContacts.find((ac: Contact) => ac.id === c.id)) {
+      setAllContacts((prev: Contact[]) => [...prev, c])
+    }
+    addContactById(c.id)
   }
 
   function removeContact(id: string) {
-    setLinkedIds((prev: { id: string; role: "primary"|"stakeholder"|"cc" }[]) => prev.filter((c: { id: string }) => c.id !== id))
+    setLinkedIds((prev: LinkedId[]) => prev.filter((c: LinkedId) => c.id !== id))
   }
 
   function getContact(id: string) {
-    return contacts.find(c => c.id === id)
+    return allContacts.find((c: Contact) => c.id === id)
+  }
+
+  async function createAndLinkContact() {
+    if (!newContact.name.trim() && !newContact.email.trim()) {
+      return
+    }
+    setCreatingContact(true)
+    try {
+      const res = await fetch('/api/contacts', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          name:    newContact.name.trim() || null,
+          email:   newContact.email.trim() || null,
+          company: newContact.company.trim() || null,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to create contact')
+      addContact(data.contact)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create contact')
+    } finally {
+      setCreatingContact(false)
+    }
   }
 
   async function save() {
@@ -113,9 +180,9 @@ export default function DealDrawer({ deal, contacts, onClose, onSaved }: Props) 
     setSaving(true)
     try {
       await fetch('/api/deals', {
-        method: 'DELETE',
+        method:  'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: deal.id }),
+        body:    JSON.stringify({ id: deal.id }),
       })
       onSaved(); onClose()
     } catch { setError('Delete failed') } finally { setSaving(false) }
@@ -126,18 +193,25 @@ export default function DealDrawer({ deal, contacts, onClose, onSaved }: Props) 
     setSaving(true)
     try {
       await fetch('/api/deals', {
-        method: 'PATCH',
+        method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: deal.id, deal_stage: 'dead' }),
+        body:    JSON.stringify({ id: deal.id, deal_stage: 'dead' }),
       })
       onSaved(); onClose()
     } catch { setError('Failed') } finally { setSaving(false) }
   }
 
   const S = {
-    label: { fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase' as const, letterSpacing: '.06em', marginBottom: 6, display: 'block' },
-    input: { width: '100%', background: 'var(--bg)', border: '1px solid var(--border2)', borderRadius: 8, padding: '9px 12px', fontSize: 13, fontFamily: 'var(--sans)', color: 'var(--text)', outline: 'none' },
-    card: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px', marginBottom: 14 },
+    label: {
+      fontSize: 11, fontWeight: 600, color: 'var(--muted)',
+      textTransform: 'uppercase' as const, letterSpacing: '.06em',
+      marginBottom: 6, display: 'block',
+    },
+    input: {
+      width: '100%', background: 'var(--bg)', border: '1px solid var(--border2)',
+      borderRadius: 8, padding: '9px 12px', fontSize: 13,
+      fontFamily: 'var(--sans)', color: 'var(--text)', outline: 'none',
+    },
   }
 
   return (
@@ -231,14 +305,14 @@ export default function DealDrawer({ deal, contacts, onClose, onSaved }: Props) 
             />
           </div>
 
-          {/* Contact picker */}
+          {/* ── Contact picker ── */}
           <div style={{ marginBottom: 16 }}>
             <label style={S.label}>Linked contacts</label>
 
             {/* Linked contact chips */}
             {linkedIds.length > 0 && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-                {linkedIds.map((l: { id: string; role: string }, i: number) => {
+                {linkedIds.map((l: LinkedId, i: number) => {
                   const c = getContact(l.id)
                   return (
                     <div key={l.id} style={{
@@ -246,7 +320,13 @@ export default function DealDrawer({ deal, contacts, onClose, onSaved }: Props) 
                       background: 'var(--surface)', border: '1px solid var(--border)',
                       borderRadius: 20, padding: '4px 10px 4px 8px', fontSize: 12,
                     }}>
-                      <div style={{ width: 18, height: 18, borderRadius: '50%', background: i === 0 ? 'var(--accent)' : 'var(--border2)', color: i === 0 ? '#fff' : 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700 }}>
+                      <div style={{
+                        width: 18, height: 18, borderRadius: '50%',
+                        background: i === 0 ? 'var(--accent)' : 'var(--border2)',
+                        color: i === 0 ? '#fff' : 'var(--muted)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 9, fontWeight: 700,
+                      }}>
                         {(c?.name ?? '?')[0].toUpperCase()}
                       </div>
                       <span style={{ color: 'var(--text)' }}>{c?.name ?? c?.email ?? 'Unknown'}</span>
@@ -258,24 +338,32 @@ export default function DealDrawer({ deal, contacts, onClose, onSaved }: Props) 
               </div>
             )}
 
-            {/* Search */}
-            <input
-              type="text"
-              value={search}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
-              placeholder="Search contacts to link…"
-              style={{ ...S.input, marginBottom: search ? 6 : 0 }}
-            />
+            {/* Search input */}
+            {!showNewForm && (
+              <input
+                type="text"
+                value={search}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  setSearch(e.target.value)
+                  setShowNewForm(false)
+                }}
+                placeholder="Search contacts to link…"
+                style={{ ...S.input, marginBottom: search ? 6 : 0 }}
+              />
+            )}
 
-            {/* Search results */}
-            {search && filteredContacts.length > 0 && (
+            {/* Search results dropdown */}
+            {!showNewForm && search && filteredContacts.length > 0 && (
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-                {filteredContacts.map((c, i) => (
-                  <div key={c.id} onClick={() => addContact(c)} style={{
-                    padding: '9px 12px', cursor: 'pointer', fontSize: 13,
-                    borderTop: i > 0 ? '1px solid var(--border)' : 'none',
-                    display: 'flex', alignItems: 'center', gap: 10,
-                  }}
+                {filteredContacts.map((c: Contact, i: number) => (
+                  <div
+                    key={c.id}
+                    onClick={() => addContact(c)}
+                    style={{
+                      padding: '9px 12px', cursor: 'pointer', fontSize: 13,
+                      borderTop: i > 0 ? '1px solid var(--border)' : 'none',
+                      display: 'flex', alignItems: 'center', gap: 10,
+                    }}
                     onMouseOver={(e: React.MouseEvent<HTMLDivElement>) => (e.currentTarget.style.background = 'var(--bg2)')}
                     onMouseOut={(e: React.MouseEvent<HTMLDivElement>)  => (e.currentTarget.style.background = 'transparent')}
                   >
@@ -289,9 +377,90 @@ export default function DealDrawer({ deal, contacts, onClose, onSaved }: Props) 
               </div>
             )}
 
-            {search && filteredContacts.length === 0 && (
-              <div style={{ padding: '10px 12px', fontSize: 12, color: 'var(--muted)', background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border)' }}>
-                No contacts found. <a href="/contacts" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Add contact →</a>
+            {/* No results — show inline create option */}
+            {!showNewForm && search && filteredContacts.length === 0 && (
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                <div style={{ padding: '9px 12px', fontSize: 12, color: 'var(--muted)', borderBottom: '1px solid var(--border)' }}>
+                  No contacts matching <strong style={{ color: 'var(--text)' }}>{search}</strong>
+                </div>
+                <div
+                  onClick={openNewContactForm}
+                  style={{
+                    padding: '10px 12px', cursor: 'pointer', fontSize: 13,
+                    display: 'flex', alignItems: 'center', gap: 8, color: 'var(--accent)',
+                  }}
+                  onMouseOver={(e: React.MouseEvent<HTMLDivElement>) => (e.currentTarget.style.background = 'var(--bg2)')}
+                  onMouseOut={(e: React.MouseEvent<HTMLDivElement>)  => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <span style={{ fontSize: 16, lineHeight: 1 }}>+</span>
+                  <span>Create <strong>&ldquo;{search}&rdquo;</strong> as new contact</span>
+                </div>
+              </div>
+            )}
+
+            {/* ── Inline new contact form ── */}
+            {showNewForm && (
+              <div style={{
+                background: 'var(--surface)', border: '1px solid var(--accent)',
+                borderRadius: 10, padding: '14px', marginTop: 4,
+              }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>+ New contact</span>
+                  <button
+                    onClick={cancelNewContact}
+                    style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 16, lineHeight: 1, padding: 0 }}
+                  >×</button>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <input
+                    type="text"
+                    placeholder="Name *"
+                    value={newContact.name}
+                    autoFocus
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewContact((prev: NewContactForm) => ({ ...prev, name: e.target.value }))}
+                    style={{ ...S.input, fontSize: 12 }}
+                  />
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    value={newContact.email}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewContact((prev: NewContactForm) => ({ ...prev, email: e.target.value }))}
+                    style={{ ...S.input, fontSize: 12 }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Company"
+                    value={newContact.company}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewContact((prev: NewContactForm) => ({ ...prev, company: e.target.value }))}
+                    style={{ ...S.input, fontSize: 12 }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                  <button
+                    onClick={createAndLinkContact}
+                    disabled={creatingContact || (!newContact.name.trim() && !newContact.email.trim())}
+                    style={{
+                      flex: 1, padding: '8px 12px', background: 'var(--accent)', color: '#fff',
+                      border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 500,
+                      cursor: creatingContact ? 'not-allowed' : 'pointer',
+                      opacity: creatingContact ? 0.7 : 1, fontFamily: 'var(--sans)',
+                    }}
+                  >
+                    {creatingContact ? 'Creating…' : 'Create & link'}
+                  </button>
+                  <button
+                    onClick={cancelNewContact}
+                    style={{
+                      padding: '8px 12px', background: 'transparent',
+                      border: '1px solid var(--border2)', borderRadius: 7,
+                      fontSize: 12, color: 'var(--muted)', cursor: 'pointer', fontFamily: 'var(--sans)',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -299,7 +468,6 @@ export default function DealDrawer({ deal, contacts, onClose, onSaved }: Props) 
 
         {/* Footer */}
         <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {/* Save */}
           <button onClick={save} disabled={saving} style={{
             width: '100%', padding: '11px', background: 'var(--accent)', color: '#fff',
             border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 500,
@@ -309,7 +477,6 @@ export default function DealDrawer({ deal, contacts, onClose, onSaved }: Props) 
             {saving ? 'Saving…' : isNew ? 'Add deal' : 'Save changes'}
           </button>
 
-          {/* Edit-only actions */}
           {!isNew && (
             <div style={{ display: 'flex', gap: 8 }}>
               {stage !== 'dead' && (
@@ -333,7 +500,8 @@ export default function DealDrawer({ deal, contacts, onClose, onSaved }: Props) 
               <button
                 onClick={() => showDelete ? deleteDeal() : setShowDelete(true)}
                 style={{
-                  flex: 1, padding: '9px', background: showDelete ? 'var(--red)' : 'transparent',
+                  flex: 1, padding: '9px',
+                  background: showDelete ? 'var(--red)' : 'transparent',
                   border: '1px solid var(--border2)', borderRadius: 8,
                   color: showDelete ? '#fff' : 'var(--muted)', fontSize: 13,
                   cursor: 'pointer', fontFamily: 'var(--sans)',
@@ -344,7 +512,6 @@ export default function DealDrawer({ deal, contacts, onClose, onSaved }: Props) 
           )}
         </div>
       </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </>
   )
 }
